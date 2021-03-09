@@ -34,6 +34,8 @@ SSO_PASSWORD=mysecretpassword \
 
 The browser will open and things will happen:
 
+- Script will log you in to Ubuntu SSO and then pause for you to 2fa
+  (you have 25 seconds before the script will time out)
 - New posts will be created for each city in the region that doesn't
   already have a post
 - The new posts (and any others that are OFF) will be turned ON (made
