@@ -55,5 +55,3 @@ I have only tested on Chrome.
 The available regions are `americas`, `emea`, and `apac`. You can
 view/update the lists of cities in those regions directly in the source
 file.
-
-The `apac` region currently has no cities defined.

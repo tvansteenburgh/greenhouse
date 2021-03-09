@@ -60,6 +60,17 @@ REGIONS = {
         'Home based - Europe, Stuttgart',
     ],
     'apac': [
+        'Home based - Asia Pacific, Auckland',
+        'Home based - Asia Pacific, Bangalore',
+        'Home based - Asia Pacific, Beijing',
+        'Home based - Asia Pacific, Hong Kong',
+        'Home based - Asia Pacific, Hyderabad',
+        'Home based - Asia Pacific, Seoul',
+        'Home based - Asia Pacific, Shanghai',
+        'Home based - Asia Pacific, Singapore',
+        'Home based - Asia Pacific, Sydney',
+        'Home based - Asia Pacific, Taipei',
+        'Home based - Asia Pacific, Tokyo',
     ]
 }
 
