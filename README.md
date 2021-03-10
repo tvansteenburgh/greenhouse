@@ -55,3 +55,13 @@ I have only tested on Chrome.
 The available regions are `americas`, `emea`, and `apac`. You can
 view/update the lists of cities in those regions directly in the source
 file.
+
+### Troubleshooting
+
+#### The script crashes with an error about `element click intercepted`.
+
+- The script is trying to 'click' on something, but another element on
+  the page is blocking the click.
+- Try making your browser bigger (especially wider). This is most likely
+  the quickest workaround.
+- Create an issue with the full error message and I'll fix it if I can.
