@@ -5,6 +5,7 @@ import contextlib
 import os
 import time
 
+import selenium
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -126,21 +127,32 @@ def main():
 
         # pause 25 seconds for 2-factor auth by user
         wait = ui.WebDriverWait(browser, 25) # timeout after 25 seconds
+        results = wait.until(lambda browser: browser.find_elements_by_class_name('job-application__offices'))
+
+        # minimize trays so they don't obstruct clicks
+        trays = browser.find_elements_by_xpath('//div[@data-provides="tray-close"]')
+        for tray in trays:
+            tray.click()
+
+        # accept cookies so the popup doesn't obstruct clicks
+        cookie_accept_btn = browser.find_elements_by_css_selector('#inform-cookies button')
+        for btn in cookie_accept_btn:
+            try:
+                # click can raise if element exists but is in a hidden block
+                btn.click()
+            except selenium.common.exceptions.ElementNotInteractableException:
+                pass
 
         multipage = False
         existing_locations = []
         while True:
-            results = wait.until(lambda browser: browser.find_elements_by_class_name('job-application__offices'))
-            # minimize trays so they don't obstruct clicks
-            trays = browser.find_elements_by_xpath('//div[@data-provides="tray-close"]')
-            for tray in trays:
-                tray.click()
-
+            # gather all existing job post locations from each page of results
             existing_locations += [result.text.strip('()') for result in results]
             next_page =  browser.find_elements_by_css_selector('a.next_page')
             if next_page:
                 multipage = True
                 next_page[0].click()
+                results = wait.until(lambda browser: browser.find_elements_by_class_name('job-application__offices'))
             else:
                 break
 
