@@ -99,6 +99,7 @@ def main():
         browser = webdriver.Firefox()
     else:
         browser = webdriver.Chrome()
+    browser.maximize_window()
 
     new_browser = True
 
