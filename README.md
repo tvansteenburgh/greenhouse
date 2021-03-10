@@ -38,12 +38,13 @@ SSO_PASSWORD=mysecretpassword \
 
 The browser will open and things will happen:
 
-- Script will log you in to Ubuntu SSO and then pause for you to 2fa
-  (you have 60 seconds before the script will time out)
+- Script will log you in to Ubuntu SSO and then pause for you to 2fa. If
+  you don't define SSO env vars, the script will pause for you to auth
+  manually. If you don't auth within 60 seconds the script will time out.
 - New posts will be created for each city in the region that doesn't
-  already have a post
+  already have a post.
 - The new posts (and any others that are OFF) will be turned ON (made
-  live on the 'Canonical - Jobs' board)
+  live on the 'Canonical - Jobs' board).
 
 If the script fails partway through you can safely rerun it, since it won't
 create a duplicate job post for cities that already have one.
