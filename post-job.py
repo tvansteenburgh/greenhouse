@@ -14,6 +14,7 @@ import selenium.webdriver.support.ui as ui
 
 SSO_EMAIL = os.getenv('SSO_EMAIL')
 SSO_PASSWORD = os.getenv('SSO_PASSWORD')
+NO_AUTH = not (SSO_EMAIL and SSO_PASSWORD)
 
 SITE = 'https://canonical.greenhouse.io'
 JOB_BOARD = 'Canonical - Jobs'
@@ -105,7 +106,7 @@ def main():
         job_posts_page_url = f'{SITE}/plans/{job_id}/jobapp'
         browser.get(job_posts_page_url)
 
-        if new_browser:
+        if new_browser and not NO_AUTH:
             # click Accept Cookies button
             accept_cookies_btn = browser.find_elements_by_xpath('//*[@id="cookie-policy-button-accept"]')
             if accept_cookies_btn:
@@ -125,8 +126,8 @@ def main():
                 continue_btn[0].click()
             new_browser = False
 
-        # pause 25 seconds for 2-factor auth by user
-        wait = ui.WebDriverWait(browser, 25) # timeout after 25 seconds
+        # pause 60 seconds for 2-factor auth by user
+        wait = ui.WebDriverWait(browser, 60) # timeout after 60 seconds
         results = wait.until(lambda browser: browser.find_elements_by_class_name('job-application__offices'))
 
         # minimize trays so they don't obstruct clicks
