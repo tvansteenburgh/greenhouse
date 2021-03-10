@@ -10,6 +10,10 @@ source .venv/bin/activate
 pip install selenium
 ```
 
+If you are using Chrome you'll need to install the appropriate version
+of ChromeDriver for your browser, see
+https://chromedriver.chromium.org/downloads.
+
 ## Duplicate job posts to different locations
 
 Start with a Greenhouse job with one job posting (the one that will be
