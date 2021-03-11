@@ -5,7 +5,7 @@
 ```bash
 git clone git@github.com:tvansteenburgh/greenhouse.git
 cd greenhouse
-virtualenv -p python3 .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install selenium
 ```
