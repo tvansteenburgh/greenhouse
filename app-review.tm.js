@@ -20,22 +20,12 @@
     makeAction('Wrong Job', 'Other (add notes below)', 'Cover letter is for a different job/company', 'Candidate rejection - application stage', doSubmit);
     makeAction('Illegible', 'Other (add notes below)', 'Submission not in English', 'Candidate rejection - application stage', doSubmit);
 
-    function addGlobalStyle(css) {
-        var head, style;
-        head = document.getElementsByTagName('head')[0];
-        if (!head) { return; }
-        style = document.createElement('style');
-        style.type = 'text/css';
-        style.innerHTML = css;
-        head.appendChild(style);
-    }
-
     function makeAction(btnText, reasonOption, notes, templateOption, doSubmit) {
         var waitOnce = true;
 
-        var zNode = document.createElement ('div');
-        zNode.innerHTML = '<button type="button" class="customAction">' + btnText + '</button>';
-        zNode.addEventListener (
+        var node = document.createElement ('div');
+        node.innerHTML = '<button type="button" class="customAction">' + btnText + '</button>';
+        node.addEventListener (
             "click",
             function(event) {
                 document.getElementById('reject_button').click();
@@ -64,7 +54,7 @@
             },
             false
         );
-        document.getElementById('actions').appendChild (zNode);
+        document.getElementById('actions').appendChild (node);
     }
 
     GM_addStyle(".customAction { background-color: white; padding: 1em 0; margin: .5em 0; font-weight: bold; width: 230px; cursor: pointer; }");
