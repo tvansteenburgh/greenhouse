@@ -5,9 +5,8 @@
 // @description  Add shortcut buttons to resume review screen
 // @author       Tim Van Steenburgh
 // @match        https://canonical.greenhouse.io/application_review*
+// @require      https://cdnjs.cloudflare.com/ajax/libs/arrive/2.4.1/arrive.min.js
 // @grant        GM_addStyle
-
-// @require  https://gist.github.com/raw/2625891/waitForKeyElements.js
 // ==/UserScript==
 
 (function() {
@@ -21,18 +20,22 @@
     makeAction('Illegible', 'Other (add notes below)', 'Submission not in English', 'Candidate rejection - application stage', doSubmit);
 
     function makeAction(btnText, reasonOption, notes, templateOption, doSubmit) {
-        var waitOnce = true;
-
+        var arriveOptions = {
+            fireOnAttributesModification: true,
+            onceOnly: true,
+            existing: true
+        };
         var node = document.createElement ('div');
         node.innerHTML = '<button type="button" class="customAction">' + btnText + '</button>';
         node.addEventListener (
             "click",
             function(event) {
                 document.getElementById('reject_button').click();
-                waitForKeyElements (
+                document.arrive(
                     "#rejection_reason",
-                    function(jNode) {
-                        var sel = jNode;
+                    arriveOptions,
+                    function() {
+                        var sel = $(this);
                         sel[0].selectedIndex = [...sel[0].options].findIndex (option => option.text === reasonOption);
                         sel.trigger("liszt:updated");
                         document.getElementById('rejection_reason_note').value = notes;
@@ -42,14 +45,16 @@
                         sel.trigger("liszt:updated");
 
                         if (doSubmit) {
-                            waitForKeyElements(
+                            document.arrive(
                                 '#reject_with_email_button:not([disabled])',
-                                function(jNode) {jNode.click()},
-                                waitOnce
+                                arriveOptions,
+                                function() {
+                                    $(this).click();
+                                    Arrive.unbindAllArrive();
+                                },
                             );
                         }
                     },
-                    waitOnce
                 );
             },
             false
