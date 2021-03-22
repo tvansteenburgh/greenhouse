@@ -1,94 +1,122 @@
 #!/usr/bin/env python3
 
 import argparse
-import contextlib
+import json
 import os
 import time
+from appdirs import user_data_dir
 
 import selenium
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 import selenium.webdriver.support.ui as ui
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
 
-
-SSO_EMAIL = os.getenv('SSO_EMAIL')
-SSO_PASSWORD = os.getenv('SSO_PASSWORD')
-NO_AUTH = not (SSO_EMAIL and SSO_PASSWORD)
-
-SITE = 'https://canonical.greenhouse.io'
-JOB_BOARD = 'Canonical - Jobs'
+SITE = "https://canonical.greenhouse.io"
+JOB_BOARD = "Canonical - Jobs"
 
 REGIONS = {
-    'americas': [
+    "americas": [
         # United States
-        'Home based - Americas, Atlanta',
-        'Home based - Americas, Austin',
-        'Home based - Americas, Boston',
-        'Home based - Americas, Chicago',
-        'Home based - Americas, Colorado',
-        'Home based - Americas, Dallas',
-        'Home based - Americas, Los Angeles',
-        'Home based - Americas, New York',
-        'Home based - Americas, Raleigh',
-        'Home based - Americas, San Francisco',
-        'Home based - Americas, Seattle',
+        "Home based - Americas, Atlanta",
+        "Home based - Americas, Austin",
+        "Home based - Americas, Boston",
+        "Home based - Americas, Charlotte",
+        "Home based - Americas, Chicago",
+        "Home based - Americas, Colorado",
+        "Home based - Americas, Dallas",
+        "Home based - Americas, Denver",
+        "Home based - Americas, Los Angeles",
+        "Home based - Americas, Miami",
+        "Home based - Americas, New York",
+        "Home based - Americas, Portland",
+        "Home based - Americas, Raleigh",
+        "Home based - Americas, San Francisco",
+        "Home based - Americas, Seattle",
         # Canada
-        'Home based - Americas, Calgary',
-        'Home based - Americas, Montreal',
-        'Home based - Americas, Ottawa',
-        'Home based - Americas, Toronto',
-        'Home based - Americas, Vancouver',
-        'Home based - Americas, Victoria',
+        "Home based - Americas, Calgary",
+        "Home based - Americas, Montreal",
+        "Home based - Americas, Ottawa",
+        "Home based - Americas, Toronto",
+        "Home based - Americas, Vancouver",
+        "Home based - Americas, Victoria",
         # South America
-        'Home based - Americas, Buenos Aires',
-        'Home based - Americas, Mexico City',
-        'Home based - Americas, Santiago',
-        'Home based - Americas, São Paulo',
+        "Home based - Americas, Buenos Aires",
+        "Home based - Americas, Mexico City",
+        "Home based - Americas, Santiago",
+        "Home based - Americas, São Paulo",
+        "Home based - Americas, Rio de Janeiro",
+        "Home based - Americas, Santiago",
+        "Home based - Americas, Montevideo",
     ],
-    'emea': [
-        'Home based - Europe, Amsterdam',
-        'Home based - Europe, Barcelona',
-        'Home based - Europe, Berlin',
-        'Home based - Europe, Copenhagen',
-        'Home based - Europe, Dublin',
-        'Home based - Europe, Eindhoven',
-        'Home based - Europe, Hamburg',
-        'Home based - Europe, Helsinki',
-        'Home based - Europe, Istanbul',
-        'Home based - Europe, London',
-        'Home based - Europe, Munich',
-        'Home based - Europe, Rotterdam',
-        'Home based - Europe, Stockholm',
-        'Home based - Europe, Stuttgart',
+    "emea": [
+        "Home based - Europe, Amsterdam",
+        "Home based - Europe, Barcelona",
+        "Home based - Europe, Berlin",
+        "Home based - Europe, Copenhagen",
+        "Home based - Europe, Dublin",
+        "Home based - Europe, Eindhoven",
+        "Home based - Europe, Hamburg",
+        "Home based - Europe, Helsinki",
+        "Home based - Europe, Istanbul",
+        "Home based - Europe, London",
+        "Home based - Europe, Munich",
+        "Home based - Europe, Rotterdam",
+        "Home based - Europe, Stockholm",
+        "Home based - Europe, Stuttgart",
     ],
-    'apac': [
-        'Home based - Asia Pacific, Auckland',
-        'Home based - Asia Pacific, Bangalore',
-        'Home based - Asia Pacific, Beijing',
-        'Home based - Asia Pacific, Hong Kong',
-        'Home based - Asia Pacific, Hyderabad',
-        'Home based - Asia Pacific, Seoul',
-        'Home based - Asia Pacific, Shanghai',
-        'Home based - Asia Pacific, Singapore',
-        'Home based - Asia Pacific, Sydney',
-        'Home based - Asia Pacific, Taipei',
-        'Home based - Asia Pacific, Tokyo',
-    ]
+    "apac": [
+        "Home based - Asia Pacific, Auckland",
+        "Home based - Asia Pacific, Bangalore",
+        "Home based - Asia Pacific, Beijing",
+        "Home based - Asia Pacific, Hong Kong",
+        "Home based - Asia Pacific, Hyderabad",
+        "Home based - Asia Pacific, Seoul",
+        "Home based - Asia Pacific, Shanghai",
+        "Home based - Asia Pacific, Singapore",
+        "Home based - Asia Pacific, Sydney",
+        "Home based - Asia Pacific, Taipei",
+        "Home based - Asia Pacific, Tokyo",
+    ],
 }
 
 
+def parse_credentials():
+    # Read configuration from secured file in $HOME/.config/
+    creds = os.path.join(user_data_dir("greenhouse"), "login.tokens")
+
+    with open(os.path.expanduser(creds), "r") as auth:
+        try:
+            creds = json.load(auth)
+            ghsso_user = creds["username"]
+            ghsso_pass = creds["password"]
+            return (ghsso_user, ghsso_pass)
+        except FileNotFoundError:
+            print("file {} does not exist".format(creds))
+
+
 def parse_args():
-    parser = argparse.ArgumentParser(description='Duplicate Greenhouse job postings to multiple locations.')
+    parser = argparse.ArgumentParser(
+        description="Duplicate Greenhouse job postings to multiple locations."
+    )
     parser.add_argument(
-        'job_ids', nargs='+',
-        help='The numeric Greenhouse job id (the number in the URL when on the Job Dashboard)')
+        "job_ids",
+        nargs="+",
+        help="The numeric Greenhouse job id (the number in the URL when on the Job Dashboard)",
+    )
     parser.add_argument(
-        '--region', dest='regions', nargs='+', choices=['americas', 'emea', 'apac'],
-        help='The regions in which to create job postings')
+        "--region",
+        dest="regions",
+        nargs="+",
+        choices=["americas", "emea", "apac"],
+        help="The regions in which to create job postings",
+    )
     parser.add_argument(
-        '--browser', dest='browser', choices=['chrome', 'firefox'], default='chrome',
-        help='The browser to use (default is chrome)')
+        "--browser",
+        dest="browser",
+        choices=["chrome", "firefox"],
+        default="chrome",
+        help="The browser to use (default is chrome)",
+    )
 
     return parser.parse_args()
 
@@ -96,7 +124,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    if args.browser == 'firefox':
+    if args.browser == "firefox":
         browser = webdriver.Firefox()
     else:
         browser = webdriver.Chrome()
@@ -104,24 +132,28 @@ def main():
 
     new_browser = True
 
+    (ghsso_user, ghsso_pass) = parse_credentials()
+
     for job_id in args.job_ids:
-        job_posts_page_url = f'{SITE}/plans/{job_id}/jobapp'
+        job_posts_page_url = f"{SITE}/plans/{job_id}/jobapp"
         browser.get(job_posts_page_url)
 
         if new_browser and not NO_AUTH:
             # click Accept Cookies button
-            accept_cookies_btn = browser.find_elements_by_xpath('//*[@id="cookie-policy-button-accept"]')
+            accept_cookies_btn = browser.find_elements_by_xpath(
+                '//*[@id="cookie-policy-button-accept"]'
+            )
             if accept_cookies_btn:
                 accept_cookies_btn[0].click()
 
             # enter Ubuntu SSO email and password
             email_txt = browser.find_element_by_id("id_email")
             if email_txt:
-                email_txt.send_keys(SSO_EMAIL)
+                email_txt.send_keys(ghsso_user)
 
             password_txt = browser.find_element_by_id("id_password")
             if password_txt:
-                password_txt.send_keys(SSO_PASSWORD)
+                password_txt.send_keys(ghsso_pass)
 
             continue_btn = browser.find_elements_by_xpath('//button[@name="continue"]')
             if continue_btn:
@@ -129,8 +161,12 @@ def main():
             new_browser = False
 
         # pause 60 seconds for 2-factor auth by user
-        wait = ui.WebDriverWait(browser, 60) # timeout after 60 seconds
-        results = wait.until(lambda browser: browser.find_elements_by_class_name('job-application__offices'))
+        wait = ui.WebDriverWait(browser, 60)  # timeout after 60 seconds
+        results = wait.until(
+            lambda browser: browser.find_elements_by_class_name(
+                "job-application__offices"
+            )
+        )
 
         # minimize trays so they don't obstruct clicks
         trays = browser.find_elements_by_xpath('//div[@data-provides="tray-close"]')
@@ -138,7 +174,9 @@ def main():
             tray.click()
 
         # accept cookies so the popup doesn't obstruct clicks
-        cookie_accept_btn = browser.find_elements_by_css_selector('#inform-cookies button')
+        cookie_accept_btn = browser.find_elements_by_css_selector(
+            "#inform-cookies button"
+        )
         for btn in cookie_accept_btn:
             try:
                 # click can raise if element exists but is in a hidden block
@@ -150,12 +188,16 @@ def main():
         existing_locations = []
         while True:
             # gather all existing job post locations from each page of results
-            existing_locations += [result.text.strip('()') for result in results]
-            next_page =  browser.find_elements_by_css_selector('a.next_page')
+            existing_locations += [result.text.strip("()") for result in results]
+            next_page = browser.find_elements_by_css_selector("a.next_page")
             if next_page:
                 multipage = True
                 next_page[0].click()
-                results = wait.until(lambda browser: browser.find_elements_by_class_name('job-application__offices'))
+                results = wait.until(
+                    lambda browser: browser.find_elements_by_class_name(
+                        "job-application__offices"
+                    )
+                )
             else:
                 break
 
@@ -167,61 +209,96 @@ def main():
             region_locations = REGIONS[region]
             new_locations = set(region_locations) - set(existing_locations)
             for location_text in sorted(new_locations):
-                publish_location_text = location_text.split(',')[-1].strip()
+                publish_location_text = location_text.split(",")[-1].strip()
 
-                duplicate_link = wait.until(lambda browser: browser.find_elements_by_xpath('//*[@id="job_applications"]//tr[1]//a[text()="Duplicate"]'))
-                page = duplicate_link[0].get_attribute('href')
+                duplicate_link = wait.until(
+                    lambda browser: browser.find_elements_by_xpath(
+                        '//*[@id="job_applications"]//tr[1]//a[text()="Duplicate"]'
+                    )
+                )
+                page = duplicate_link[0].get_attribute("href")
                 browser.get(page)
 
-                job_name_txt = browser.find_elements_by_xpath('//input[../label="Job Name"]')[0]
-                job_name = job_name_txt.get_attribute('value').replace('Copy of ', '').strip()
+                job_name_txt = browser.find_elements_by_xpath(
+                    '//input[../label="Job Name"]'
+                )[0]
+                job_name = (
+                    job_name_txt.get_attribute("value").replace("Copy of ", "").strip()
+                )
                 job_name_txt.clear()
                 job_name_txt.send_keys(job_name)
 
-                post_to = browser.find_elements_by_xpath('//label[text()="Post To"]/..//input[1]')[0]
+                post_to = browser.find_elements_by_xpath(
+                    '//label[text()="Post To"]/..//input[1]'
+                )[0]
                 post_to.send_keys(JOB_BOARD)
                 post_to.send_keys(Keys.ENTER)
 
-                location = browser.find_elements_by_xpath('//label[text()="Location"]/..//input[1]')[0]
+                location = browser.find_elements_by_xpath(
+                    '//label[text()="Location"]/..//input[1]'
+                )[0]
                 location.send_keys(location_text)
 
-                browser.find_elements_by_xpath('//label[text()="Glassdoor"]/input[1]')[0].click()
-                browser.find_elements_by_xpath('//label[text()="Indeed"]/input[1]')[0].click()
-                browser.find_elements_by_xpath('//label[text()="Remote"]/input[1]')[0].click()
-                publish_location = browser.find_elements_by_xpath('//input[@placeholder="Select location"]')[0]
+                browser.find_elements_by_xpath('//label[text()="Glassdoor"]/input[1]')[
+                    0
+                ].click()
+                browser.find_elements_by_xpath('//label[text()="Indeed"]/input[1]')[
+                    0
+                ].click()
+                browser.find_elements_by_xpath('//label[text()="Remote"]/input[1]')[
+                    0
+                ].click()
+                publish_location = browser.find_elements_by_xpath(
+                    '//input[@placeholder="Select location"]'
+                )[0]
                 publish_location.send_keys(publish_location_text)
                 popup_menu_xpath = (
                     f'//ul[contains(@class, "ui-menu")]'
                     f'/li[contains(@class, "ui-menu-item")]'
                     f'/div[contains(text(), "{publish_location_text}")]'
                 )
-                location_choices = wait.until(lambda browser: browser.find_elements_by_xpath(popup_menu_xpath))
+                location_choices = wait.until(
+                    lambda browser: browser.find_elements_by_xpath(popup_menu_xpath)
+                )
                 publish_location.send_keys(Keys.DOWN)
                 publish_location.send_keys(Keys.TAB)
-                time.sleep(.5)
+                time.sleep(0.5)
 
                 # click the Save button
                 save_btn = browser.find_elements_by_xpath('//a[text()="Save"]')[0]
                 save_btn.click()
 
-                #publish_btns = wait.until(lambda browser: browser.find_elements_by_css_selector('tr.job-application.draft img.publish-application-button'))
-                wait.until(lambda browser: browser.find_elements_by_class_name('job-application__offices'))
-                publish_btns = browser.find_elements_by_css_selector('tr.job-application.draft img.publish-application-button')
+                # publish_btns = wait.until(lambda browser: browser.find_elements_by_css_selector('tr.job-application.draft img.publish-application-button'))
+                wait.until(
+                    lambda browser: browser.find_elements_by_class_name(
+                        "job-application__offices"
+                    )
+                )
+                publish_btns = browser.find_elements_by_css_selector(
+                    "tr.job-application.draft img.publish-application-button"
+                )
                 for btn in publish_btns:
                     btn.click()
-                    time.sleep(.2)
+                    time.sleep(0.2)
 
         while True:
-            results = wait.until(lambda browser: browser.find_elements_by_class_name('job-application__offices'))
-            publish_btns = browser.find_elements_by_css_selector('tr.job-application.draft img.publish-application-button')
+            results = wait.until(
+                lambda browser: browser.find_elements_by_class_name(
+                    "job-application__offices"
+                )
+            )
+            publish_btns = browser.find_elements_by_css_selector(
+                "tr.job-application.draft img.publish-application-button"
+            )
             for btn in publish_btns:
                 btn.click()
-                time.sleep(.2)
-            next_page =  browser.find_elements_by_css_selector('a.next_page')
+                time.sleep(0.2)
+            next_page = browser.find_elements_by_css_selector("a.next_page")
             if next_page:
                 next_page[0].click()
             else:
                 break
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
