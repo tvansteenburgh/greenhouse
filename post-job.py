@@ -55,6 +55,7 @@ REGIONS = {
         'Home based - Europe, Eindhoven',
         'Home based - Europe, Hamburg',
         'Home based - Europe, Helsinki',
+        'Home based - Europe, Istanbul',
         'Home based - Europe, London',
         'Home based - Europe, Munich',
         'Home based - Europe, Rotterdam',
