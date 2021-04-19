@@ -131,6 +131,11 @@ def main():
         wait = ui.WebDriverWait(browser, 60) # timeout after 60 seconds
         results = wait.until(lambda browser: browser.find_elements_by_class_name('job-application__offices'))
 
+        # click "Got it" button for new tips
+        got_it_btn = browser.find_elements_by_xpath('//a[text()="Got it"]')
+        if got_it_btn:
+            got_it_btn[0].click()
+
         # minimize trays so they don't obstruct clicks
         trays = browser.find_elements_by_xpath('//div[@data-provides="tray-close"]')
         for tray in trays:
