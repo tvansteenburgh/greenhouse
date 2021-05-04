@@ -132,6 +132,15 @@ def main():
         wait = ui.WebDriverWait(browser, 60) # timeout after 60 seconds
         results = wait.until(lambda browser: browser.find_elements_by_class_name('job-application__offices'))
 
+        # accept cookies so the popup doesn't obstruct clicks
+        cookie_accept_btn = browser.find_elements_by_css_selector('#inform-cookies button')
+        for btn in cookie_accept_btn:
+            try:
+                # click can raise if element exists but is in a hidden block
+                btn.click()
+            except selenium.common.exceptions.ElementNotInteractableException:
+                pass
+
         # click "Got it" button for new tips
         got_it_btn = browser.find_elements_by_xpath('//a[text()="Got it"]')
         if got_it_btn:
@@ -141,15 +150,6 @@ def main():
         trays = browser.find_elements_by_xpath('//div[@data-provides="tray-close"]')
         for tray in trays:
             tray.click()
-
-        # accept cookies so the popup doesn't obstruct clicks
-        cookie_accept_btn = browser.find_elements_by_css_selector('#inform-cookies button')
-        for btn in cookie_accept_btn:
-            try:
-                # click can raise if element exists but is in a hidden block
-                btn.click()
-            except selenium.common.exceptions.ElementNotInteractableException:
-                pass
 
         multipage = False
         existing_locations = []
