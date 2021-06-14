@@ -68,7 +68,7 @@ REGIONS = {
         'Home based - Europe, Glasgow',
         'Home based - Europe, Helsinki',
         'Home based - Europe, Istanbul',
-        'Home based - Europe, Krakaw',
+        'Home based - Europe, Kraków',
         'Home based - Europe, Lisbon',
         'Home based - Europe, Ljubljana',
         'Home based - Europe, Lyon',
