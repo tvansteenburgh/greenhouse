@@ -4,15 +4,18 @@ import argparse
 import json
 import os
 import time
-from appdirs import user_data_dir
+from re import search
 
 import selenium
 import selenium.webdriver.support.ui as ui
+from appdirs import user_data_dir
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
 
 SITE = "https://canonical.greenhouse.io"
 JOB_BOARD = "Canonical - Jobs"
+NO_AUTH = ""
 
 REGIONS = {
     "americas": [
@@ -24,7 +27,6 @@ REGIONS = {
         "Home based - Americas, Chicago",
         "Home based - Americas, Colorado",
         "Home based - Americas, Dallas",
-        "Home based - Americas, Denver",
         "Home based - Americas, Los Angeles",
         "Home based - Americas, Miami",
         "Home based - Americas, New York",
@@ -42,13 +44,12 @@ REGIONS = {
         # South America
         "Home based - Americas, Buenos Aires",
         "Home based - Americas, Mexico City",
-        "Home based - Americas, Santiago",
-        "Home based - Americas, São Paulo",
+        "Home based - Americas, Montevideo",
         "Home based - Americas, Rio de Janeiro",
         "Home based - Americas, Santiago",
-        "Home based - Americas, Montevideo",
+        "Home based - Americas, São Paulo",
     ],
-    "emea": [
+    "eu": [
         "Home based - Europe, Amsterdam",
         "Home based - Europe, Barcelona",
         "Home based - Europe, Berlin",
@@ -58,14 +59,70 @@ REGIONS = {
         "Home based - Europe, Hamburg",
         "Home based - Europe, Helsinki",
         "Home based - Europe, Istanbul",
-        "Home based - Europe, London",
         "Home based - Europe, Munich",
         "Home based - Europe, Rotterdam",
         "Home based - Europe, Stockholm",
         "Home based - Europe, Stuttgart",
     ],
+    "brasil": [
+        "Home based - Americas, Santiago",
+        "Home based - Americas, Rio de Janeiro",
+        "Home based - Americas, Belo Horizonte",
+        "Home based - Americas, Porto Alegre",
+        "Home based - Americas, Salvador",
+        "Home based - Americas, Resife",
+        "Home based - Americas, Fortaleza",
+    ],
+    "emea": [
+        "Home based - Africa, Cairo",
+        "Home based - Africa, Cape Town",
+        "Home based - Africa, Lagos",
+        "Home based - Africa, Nairobi",
+        "Home based - Europe, Amsterdam",
+        "Home based - Europe, Ankara",
+        "Home based - Europe, Athens",
+        "Home based - Europe, Barcelona",
+        "Home based - Europe, Berlin",
+        "Home based - Europe, Bratislava",
+        "Home based - Europe, Brno",
+        "Home based - Europe, Brussels",
+        "Home based - Europe, Bucharest",
+        "Home based - Europe, Budapest",
+        "Home based - Europe, Cluj-Napoca",
+        "Home based - Europe, Dublin",
+        "Home based - Europe, Edinburgh",
+        "Home based - Europe, Frankfurt",
+        "Home based - Europe, Glasgow",
+        "Home based - Europe, Helsinki",
+        "Home based - Europe, Istanbul",
+        "Home based - Europe, Kraków",
+        "Home based - Europe, Lisbon",
+        "Home based - Europe, Ljubljana",
+        "Home based - Europe, Lyon",
+        "Home based - Europe, Madrid",
+        "Home based - Europe, Manchester",
+        "Home based - Europe, Milan",
+        "Home based - Europe, Moscow",
+        "Home based - Europe, Munich",
+        "Home based - Europe, Oslo",
+        "Home based - Europe, Paris",
+        "Home based - Europe, Plovdiv",
+        "Home based - Europe, Prague",
+        "Home based - Europe, Riga",
+        "Home based - Europe, Rome",
+        "Home based - Europe, Sofia",
+        "Home based - Europe, St. Petersburg",
+        "Home based - Europe, Stockholm",
+        "Home based - Europe, Tallinn",
+        "Home based - Europe, Timișoara",
+        "Home based - Europe, Vienna",
+        "Home based - Europe, Vilnius",
+        "Home based - Europe, Warsaw",
+        "Home based - Europe, Wrocław",
+        "Home based - Europe, Zagreb",
+    ],
     "apac": [
-        "Home based - Asia Pacific, Auckland",
+        "Home based - Asia Pacific, Auckland, Auckland",
         "Home based - Asia Pacific, Bangalore",
         "Home based - Asia Pacific, Beijing",
         "Home based - Asia Pacific, Hong Kong",
@@ -107,7 +164,7 @@ def parse_args():
         "--region",
         dest="regions",
         nargs="+",
-        choices=["americas", "emea", "apac"],
+        choices=["americas", "eu", "brasil", "emea", "apac"],
         help="The regions in which to create job postings",
     )
     parser.add_argument(
@@ -124,10 +181,13 @@ def parse_args():
 def main():
     args = parse_args()
 
+    options = Options()
+    # options.add_argument("--headless")
+
     if args.browser == "firefox":
         browser = webdriver.Firefox()
     else:
-        browser = webdriver.Chrome()
+        browser = webdriver.Chrome(options=options)
     browser.maximize_window()
 
     new_browser = True
@@ -168,11 +228,6 @@ def main():
             )
         )
 
-        # minimize trays so they don't obstruct clicks
-        trays = browser.find_elements_by_xpath('//div[@data-provides="tray-close"]')
-        for tray in trays:
-            tray.click()
-
         # accept cookies so the popup doesn't obstruct clicks
         cookie_accept_btn = browser.find_elements_by_css_selector(
             "#inform-cookies button"
@@ -183,6 +238,16 @@ def main():
                 btn.click()
             except selenium.common.exceptions.ElementNotInteractableException:
                 pass
+
+        # click "Got it" button for new tips
+        got_it_btn = browser.find_elements_by_xpath('//a[text()="Got it"]')
+        if got_it_btn:
+            got_it_btn[0].click()
+
+        # minimize trays so they don't obstruct clicks
+        trays = browser.find_elements_by_xpath('//div[@data-provides="tray-close"]')
+        for tray in trays:
+            tray.click()
 
         multipage = False
         existing_locations = []
@@ -217,7 +282,14 @@ def main():
                     )
                 )
                 page = duplicate_link[0].get_attribute("href")
-                browser.get(page)
+
+                # This is a quick workaround for roles with multiple
+                # _different_ job posts within it
+                if search('12345', page):
+                    browser.get(page)
+                else:
+                    print(page)
+                continue
 
                 job_name_txt = browser.find_elements_by_xpath(
                     '//input[../label="Job Name"]'
@@ -225,6 +297,9 @@ def main():
                 job_name = (
                     job_name_txt.get_attribute("value").replace("Copy of ", "").strip()
                 )
+
+                print(job_name)
+
                 job_name_txt.clear()
                 job_name_txt.send_keys(job_name)
 
@@ -251,6 +326,7 @@ def main():
                 publish_location = browser.find_elements_by_xpath(
                     '//input[@placeholder="Select location"]'
                 )[0]
+                publish_location.clear()
                 publish_location.send_keys(publish_location_text)
                 popup_menu_xpath = (
                     f'//ul[contains(@class, "ui-menu")]'
