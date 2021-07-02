@@ -182,6 +182,12 @@ def parse_args():
         help="The browser to use (default is chrome)",
     )
 
+    parser.add_argument(
+        "--limit",
+        dest="limit",
+        help="The specific job post to clone inside a REQ",
+    )
+
     return parser.parse_args()
 
 
@@ -292,11 +298,13 @@ def main():
 
                 # This is a quick workaround for roles with multiple
                 # _different_ job posts within it
-                if search('12345', page):
-                    browser.get(page)
-                else:
-                    print(page)
-                continue
+                if args.limit:
+                    print(f"Limited to: {args.limit}")
+                    if search(args.limit, page):
+                        browser.get(page)
+                    else:
+                        print(page)
+                    # continue
 
                 job_name_txt = browser.find_elements_by_xpath(
                     '//input[../label="Job Name"]'
