@@ -20,23 +20,34 @@ NO_AUTH = ""
 REGIONS = {
     "americas": [
         # United States
+        "Home based - Americas, Anchorage",
         "Home based - Americas, Atlanta",
         "Home based - Americas, Austin",
+        "Home based - Americas, Boise",
         "Home based - Americas, Boston",
         "Home based - Americas, Charlotte",
         "Home based - Americas, Chicago",
         "Home based - Americas, Colorado",
         "Home based - Americas, Columbus",
         "Home based - Americas, Dallas",
+        "Home based - Americas, Fresno",
         "Home based - Americas, Houston",
+        "Home based - Americas, Las Vegas",
         "Home based - Americas, Los Angeles",
         "Home based - Americas, Miami",
         "Home based - Americas, New York",
         "Home based - Americas, Philadelphia",
+        "Home based - Americas, Phoenix",
         "Home based - Americas, Portland",
         "Home based - Americas, Raleigh",
+        "Home based - Americas, Sacramento",
+        "Home based - Americas, Salt Lake City",
+        "Home based - Americas, San Bernadino",
+        "Home based - Americas, San Diego",
         "Home based - Americas, San Francisco",
         "Home based - Americas, Seattle",
+        "Home based - Americas, Spokane",
+        "Home based - Americas, Tacoma",
         # Canada
         "Home based - Americas, Calgary",
         "Home based - Americas, Montreal",
@@ -183,9 +194,9 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--limit",
-        dest="limit",
-        help="The specific job post to clone inside a REQ",
+        "--limit", 
+        dest="limit", 
+        help="The specific job post to clone inside a REQ"
     )
 
     return parser.parse_args()
@@ -264,13 +275,22 @@ def main():
 
         multipage = False
         existing_locations = []
+        # job_locations = set()
         while True:
             # gather all existing job post locations from each page of results
             existing_locations += [result.text.strip("()") for result in results]
+
+            # for result in results:
+            #     result = result.text.strip("()")
+            #     job_locations.add(result)
+            # existing_locations = list(job_locations)
+
+            print("DEBUG existing_locations:", *existing_locations, sep="\n")
             next_page = browser.find_elements_by_css_selector("a.next_page")
             if next_page:
                 multipage = True
                 next_page[0].click()
+                print(browser.find_elements_by_class_name("job-application__offices"))
                 results = wait.until(
                     lambda browser: browser.find_elements_by_class_name(
                         "job-application__offices"
@@ -313,8 +333,6 @@ def main():
                     job_name_txt.get_attribute("value").replace("Copy of ", "").strip()
                 )
 
-                print(job_name)
-
                 job_name_txt.clear()
                 job_name_txt.send_keys(job_name)
 
@@ -327,6 +345,7 @@ def main():
                 location = browser.find_elements_by_xpath(
                     '//label[text()="Location"]/..//input[1]'
                 )[0]
+                location.clear()
                 location.send_keys(location_text)
 
                 browser.find_elements_by_xpath('//label[text()="Glassdoor"]/input[1]')[
