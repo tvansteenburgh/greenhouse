@@ -10,9 +10,8 @@ import selenium
 import selenium.webdriver.support.ui as ui
 from appdirs import user_data_dir
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 gh_url = "https://canonical.greenhouse.io"
@@ -230,7 +229,7 @@ def delete_posts(browser, wait, job_id):
         browser.refresh()
 
         if i > 1:
-            active_post = browser.find_element(By.CSS_SELECTOR,".job-application:nth-child(2) .unpublish-application-button",).click()
+            browser.find_element(By.CSS_SELECTOR,".job-application:nth-child(2) .unpublish-application-button",).click()
             browser.find_element(By.LINK_TEXT, "Unpublish").click()
 
             # Click options menu (Delete/Duplicate)
@@ -386,16 +385,12 @@ def main():
                 job_name_txt = browser.find_elements_by_xpath(
                     '//input[../label="Job Name"]'
                 )[0]
-                job_name = (
-                    job_name_txt.get_attribute("value").replace("Copy of ", "").strip()
-                )
+                job_name = (job_name_txt.get_attribute("value").replace("Copy of ", "").strip())
 
                 job_name_txt.clear()
                 job_name_txt.send_keys(job_name)
 
-                post_to = browser.find_elements_by_xpath(
-                    '//label[text()="Post To"]/..//input[1]'
-                )[0]
+                post_to = browser.find_elements_by_xpath('//label[text()="Post To"]/..//input[1]')[0]
                 post_to.send_keys(JOB_BOARD)
                 post_to.send_keys(Keys.ENTER)
 
@@ -406,18 +401,10 @@ def main():
                 location.send_keys(location_text)
                 print(f"Publishing job {job_id} to {location_text}...")
 
-                browser.find_elements_by_xpath('//label[text()="Glassdoor"]/input[1]')[
-                    0
-                ].click()
-                browser.find_elements_by_xpath('//label[text()="Indeed"]/input[1]')[
-                    0
-                ].click()
-                browser.find_elements_by_xpath('//label[text()="Remote"]/input[1]')[
-                    0
-                ].click()
-                publish_location = browser.find_elements_by_xpath(
-                    '//input[@placeholder="Select location"]'
-                )[0]
+                browser.find_elements_by_xpath('//label[text()="Glassdoor"]/input[1]')[0].click()
+                browser.find_elements_by_xpath('//label[text()="Indeed"]/input[1]')[0].click()
+                browser.find_elements_by_xpath('//label[text()="Remote"]/input[1]')[0].click()
+                publish_location = browser.find_elements_by_xpath('//input[@placeholder="Select location"]')[0]
                 publish_location.clear()
                 publish_location.send_keys(publish_location_text)
                 popup_menu_xpath = (
@@ -436,21 +423,18 @@ def main():
                 save_btn = browser.find_elements_by_xpath('//a[text()="Save"]')[0]
                 save_btn.click()
 
-                # publish_btns = wait.until(lambda browser: browser.find_elements_by_css_selector('tr.job-application.draft img.publish-application-button'))
                 wait.until(
                     lambda browser: browser.find_elements_by_class_name(
                         "job-application__offices"
                     )
                 )
-                publish_btns = browser.find_elements_by_css_selector(
-                    "tr.job-application.draft img.publish-application-button"
-                )
+                publish_btns = browser.find_elements_by_css_selector("tr.job-application.draft img.publish-application-button")
                 for btn in publish_btns:
                     btn.click()
                     time.sleep(0.5)
 
         while True:
-            results = browser.find_elements_by_class_name("job-application__offices")
+            job_locations = browser.find_elements_by_class_name("job-application__offices")
             publish_btns = browser.find_elements_by_css_selector(
                 "tr.job-application.draft img.publish-application-button"
             )
