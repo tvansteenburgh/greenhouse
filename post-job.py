@@ -10,12 +10,13 @@ import selenium
 import selenium.webdriver.support.ui as ui
 from appdirs import user_data_dir
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
 
-SITE = "https://canonical.greenhouse.io"
+gh_url = "https://canonical.greenhouse.io"
 JOB_BOARD = "Canonical - Jobs"
-NO_AUTH = ""
 
 REGIONS = {
     "americas": [
@@ -42,9 +43,9 @@ REGIONS = {
         "Home based - Americas, Raleigh",
         "Home based - Americas, Sacramento",
         "Home based - Americas, Salt Lake City",
-        "Home based - Americas, San Bernadino",
-        "Home based - Americas, San Diego",
-        "Home based - Americas, San Francisco",
+        "Home based - Americas, San Bernadino, California",
+        "Home based - Americas, San Diego, California",
+        "Home based - Americas, San Francisco, California",
         "Home based - Americas, Seattle",
         "Home based - Americas, Spokane",
         "Home based - Americas, Tacoma",
@@ -154,7 +155,7 @@ REGIONS = {
     ],
 }
 
-
+###############################################################
 def parse_credentials():
     # Read configuration from secured file in $HOME/.config/
     creds = os.path.join(user_data_dir("greenhouse"), "login.tokens")
@@ -169,6 +170,78 @@ def parse_credentials():
             print("file {} does not exist".format(creds))
 
 
+###############################################################
+def sso_authenticate(browser, args):
+    (ghsso_user, ghsso_pass) = parse_credentials()
+
+    browser.get(gh_url)
+    # click Accept Cookies button
+    accept_cookies_btn = browser.find_elements_by_xpath('//*[@id="cookie-policy-button-accept"]')
+    if accept_cookies_btn:
+        accept_cookies_btn[0].click()
+
+    # enter Ubuntu SSO email and password
+    email_txt = browser.find_element_by_id("id_email")
+    if email_txt:
+        email_txt.send_keys(ghsso_user)
+
+    password_txt = browser.find_element_by_id("id_password")
+    if password_txt:
+        password_txt.send_keys(ghsso_pass)
+
+    continue_btn = browser.find_elements_by_xpath('//button[@name="continue"]')
+    if continue_btn:
+        continue_btn[0].click()
+
+    # accept cookies so the popup doesn't obstruct clicks
+    cookie_accept_btn = browser.find_elements_by_css_selector("#inform-cookies button")
+    for btn in cookie_accept_btn:
+        try:
+            # click can raise if element exists but is in a hidden block
+            btn.click()
+        except selenium.common.exceptions.ElementNotInteractableException:
+            pass
+
+    # click "Got it" button for new tips
+    got_it_btn = browser.find_elements_by_xpath('//a[text()="Got it"]')
+    if got_it_btn:
+        got_it_btn[0].click()
+
+    # minimize trays so they don't obstruct clicks
+    trays = browser.find_elements_by_xpath('//div[@data-provides="tray-close"]')
+    for tray in trays:
+        tray.click()
+
+    if args.headless:
+        mfa_token = input("Enter your 2FA token: ")
+        time.sleep(0.2)
+        mfa_txt = browser.find_element_by_xpath('//*[@id="id_oath_token"]')
+        mfa_txt.send_keys(mfa_token)
+        auth_button = browser.find_elements_by_xpath('//*[@id="login-form"]/button')[0]
+        auth_button.click()
+
+
+###############################################################
+def delete_posts(browser, wait, job_id):
+    browser.get(f"{gh_url}/plans/{job_id}/jobapp")
+    job_posts = len(wait.until(lambda browser: browser.find_elements_by_xpath('//*[@id="job_applications"]/tbody/tr')))
+
+    for i in range(job_posts, 0, -1):
+        browser.refresh()
+
+        if i > 1:
+            active_post = browser.find_element(By.CSS_SELECTOR,".job-application:nth-child(2) .unpublish-application-button",).click()
+            browser.find_element(By.LINK_TEXT, "Unpublish").click()
+
+            # Click options menu (Delete/Duplicate)
+            browser.find_elements_by_xpath('//*[@id="job_applications"]/tbody/tr[2]/td[3]/div/div[1]')[0].click()
+            print(f"Deleting post {i} from job {job_id} ...")
+            browser.find_elements_by_xpath('//*[@id="job_applications"]/tbody/tr[2]/td[3]/div/div[2]/span/a')[0].click()
+            browser.find_elements_by_xpath('//*[@id="confirm-delete-post"]')[0].click()
+            time.sleep(0.2)
+
+
+###############################################################
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Duplicate Greenhouse job postings to multiple locations."
@@ -194,108 +267,89 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--limit", 
-        dest="limit", 
+        "--reset",
+        action="store_true",
+        help="Delete all posts under a given job_id"
+    )
+
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run the automation without the GUI"
+    )
+
+    parser.add_argument(
+        "--limit",
+        dest="limit",
         help="The specific job post to clone inside a REQ"
     )
 
     return parser.parse_args()
 
 
+###############################################################
 def main():
     args = parse_args()
 
     options = Options()
-    # options.add_argument("--headless")
+
+    prefs = {
+        "profile.default_content_setting_values": {
+            "plugins": 2,
+            "popups": 2,
+            "geolocation": 2,
+            "notifications": 2,
+            "fullscreen": 2,
+            "ssl_cert_decisions": 2,
+            "site_engagement": 2,
+            "durable_storage": 2,
+        }
+    }
+
+    if args.headless:
+        options.add_argument("--headless")
+        options.add_argument("--window-size=1920,1080")
+    else:
+        options.add_experimental_option("prefs", prefs)
+        options.add_argument("disable-infobars")
+        options.add_argument("--disable-extensions")
 
     if args.browser == "firefox":
         browser = webdriver.Firefox()
     else:
-        browser = webdriver.Chrome(options=options)
+        browser = webdriver.Chrome(
+            options=options, executable_path="/opt/bin/chromedriver"
+        )
     browser.maximize_window()
 
-    new_browser = True
-
-    (ghsso_user, ghsso_pass) = parse_credentials()
+    sso_authenticate(browser, args)
 
     for job_id in args.job_ids:
-        job_posts_page_url = f"{SITE}/plans/{job_id}/jobapp"
+        job_posts_page_url = f"{gh_url}/plans/{job_id}/jobapp"
         browser.get(job_posts_page_url)
+        wait = ui.WebDriverWait(browser, 60) # timeout after 60 seconds
 
-        if new_browser and not NO_AUTH:
-            # click Accept Cookies button
-            accept_cookies_btn = browser.find_elements_by_xpath(
-                '//*[@id="cookie-policy-button-accept"]'
-            )
-            if accept_cookies_btn:
-                accept_cookies_btn[0].click()
+        if args.reset:
+            delete_posts(browser, wait, job_id)
+            exit()
 
-            # enter Ubuntu SSO email and password
-            email_txt = browser.find_element_by_id("id_email")
-            if email_txt:
-                email_txt.send_keys(ghsso_user)
-
-            password_txt = browser.find_element_by_id("id_password")
-            if password_txt:
-                password_txt.send_keys(ghsso_pass)
-
-            continue_btn = browser.find_elements_by_xpath('//button[@name="continue"]')
-            if continue_btn:
-                continue_btn[0].click()
-            new_browser = False
-
-        # pause 60 seconds for 2-factor auth by user
-        wait = ui.WebDriverWait(browser, 60)  # timeout after 60 seconds
-        results = wait.until(
-            lambda browser: browser.find_elements_by_class_name(
-                "job-application__offices"
-            )
-        )
-
-        # accept cookies so the popup doesn't obstruct clicks
-        cookie_accept_btn = browser.find_elements_by_css_selector(
-            "#inform-cookies button"
-        )
-        for btn in cookie_accept_btn:
-            try:
-                # click can raise if element exists but is in a hidden block
-                btn.click()
-            except selenium.common.exceptions.ElementNotInteractableException:
-                pass
-
-        # click "Got it" button for new tips
-        got_it_btn = browser.find_elements_by_xpath('//a[text()="Got it"]')
-        if got_it_btn:
-            got_it_btn[0].click()
-
-        # minimize trays so they don't obstruct clicks
-        trays = browser.find_elements_by_xpath('//div[@data-provides="tray-close"]')
-        for tray in trays:
-            tray.click()
+        job_locations = wait.until(lambda browser: browser.find_elements_by_class_name("job-application__offices"))
 
         multipage = False
         existing_locations = []
-        # job_locations = set()
+
+        # gather all existing job post locations from each page of results
+        existing_locations += [result.text.strip("()") for result in job_locations]
+        next_page = browser.find_elements_by_class_name('next_page')
+
         while True:
-            # gather all existing job post locations from each page of results
-            existing_locations += [result.text.strip("()") for result in results]
-
-            # for result in results:
-            #     result = result.text.strip("()")
-            #     job_locations.add(result)
-            # existing_locations = list(job_locations)
-
-            print("DEBUG existing_locations:", *existing_locations, sep="\n")
-            next_page = browser.find_elements_by_css_selector("a.next_page")
             if next_page:
                 multipage = True
                 next_page[0].click()
-                print(browser.find_elements_by_class_name("job-application__offices"))
-                results = wait.until(
-                    lambda browser: browser.find_elements_by_class_name(
-                        "job-application__offices"
-                    )
-                )
+                time.sleep(2.5)
+                more_jobs = browser.find_elements_by_class_name("job-application__offices")
+                for s in more_jobs:
+                    existing_locations.append(s.text.strip("()"))
             else:
                 break
 
@@ -306,6 +360,7 @@ def main():
         for region in args.regions:
             region_locations = REGIONS[region]
             new_locations = set(region_locations) - set(existing_locations)
+
             for location_text in sorted(new_locations):
                 publish_location_text = location_text.split(",")[-1].strip()
 
@@ -324,6 +379,8 @@ def main():
                         browser.get(page)
                     else:
                         print(page)
+                else:
+                    browser.get(page)
                     # continue
 
                 job_name_txt = browser.find_elements_by_xpath(
@@ -347,6 +404,7 @@ def main():
                 )[0]
                 location.clear()
                 location.send_keys(location_text)
+                print(f"Publishing job {job_id} to {location_text}...")
 
                 browser.find_elements_by_xpath('//label[text()="Glassdoor"]/input[1]')[
                     0
@@ -389,20 +447,16 @@ def main():
                 )
                 for btn in publish_btns:
                     btn.click()
-                    time.sleep(0.2)
+                    time.sleep(0.5)
 
         while True:
-            results = wait.until(
-                lambda browser: browser.find_elements_by_class_name(
-                    "job-application__offices"
-                )
-            )
+            results = browser.find_elements_by_class_name("job-application__offices")
             publish_btns = browser.find_elements_by_css_selector(
                 "tr.job-application.draft img.publish-application-button"
             )
             for btn in publish_btns:
                 btn.click()
-                time.sleep(0.2)
+                time.sleep(0.5)
             next_page = browser.find_elements_by_css_selector("a.next_page")
             if next_page:
                 next_page[0].click()
