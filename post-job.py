@@ -339,7 +339,7 @@ def main():
 
         # gather all existing job post locations from each page of results
         existing_locations += [result.text.strip("()") for result in job_locations]
-        next_page = browser.find_elements_by_class_name('next_page')
+        next_page = browser.find_elements_by_class_name("next_page")
 
         while True:
             if next_page:
@@ -356,6 +356,9 @@ def main():
         if multipage:
             browser.get(job_posts_page_url)
 
+        if args.limit:
+            print(f"Filtered cloning to post_id: {args.limit}")
+
         for region in args.regions:
             region_locations = REGIONS[region]
             new_locations = set(region_locations) - set(existing_locations)
@@ -363,28 +366,22 @@ def main():
             for location_text in sorted(new_locations):
                 publish_location_text = location_text.split(",")[-1].strip()
 
-                duplicate_link = wait.until(
-                    lambda browser: browser.find_elements_by_xpath(
-                        '//*[@id="job_applications"]//tr[1]//a[text()="Duplicate"]'
-                    )
-                )
-                page = duplicate_link[0].get_attribute("href")
+                duplicate_link = []
+                duplicate_link = wait.until(lambda browser: browser.find_elements_by_xpath('//*[@id="job_applications"]//tr//a[text()="Duplicate"]'))
 
                 # This is a quick workaround for roles with multiple
                 # _different_ job posts within it
                 if args.limit:
-                    print(f"Limited to: {args.limit}")
+                    result = list(filter(lambda u: args.limit in u.get_attribute("href"),duplicate_link,))
+                    page = result[0].get_attribute("href")
                     if search(args.limit, page):
                         browser.get(page)
-                    else:
-                        print(page)
                 else:
                     browser.get(page)
                     # continue
 
-                job_name_txt = browser.find_elements_by_xpath(
-                    '//input[../label="Job Name"]'
-                )[0]
+                job_name_txt = browser.find_elements_by_xpath('//input[../label="Job Name"]')[0]
+
                 job_name = (job_name_txt.get_attribute("value").replace("Copy of ", "").strip())
 
                 job_name_txt.clear()
@@ -394,9 +391,7 @@ def main():
                 post_to.send_keys(JOB_BOARD)
                 post_to.send_keys(Keys.ENTER)
 
-                location = browser.find_elements_by_xpath(
-                    '//label[text()="Location"]/..//input[1]'
-                )[0]
+                location = browser.find_elements_by_xpath('//label[text()="Location"]/..//input[1]')[0]
                 location.clear()
                 location.send_keys(location_text)
                 print(f"Publishing job {job_id} to {location_text}...")
@@ -412,9 +407,7 @@ def main():
                     f'/li[contains(@class, "ui-menu-item")]'
                     f'/div[contains(text(), "{publish_location_text}")]'
                 )
-                location_choices = wait.until(
-                    lambda browser: browser.find_elements_by_xpath(popup_menu_xpath)
-                )
+                location_choices = wait.until(lambda browser: browser.find_elements_by_xpath(popup_menu_xpath))
                 publish_location.send_keys(Keys.DOWN)
                 publish_location.send_keys(Keys.TAB)
                 time.sleep(0.5)
@@ -423,11 +416,8 @@ def main():
                 save_btn = browser.find_elements_by_xpath('//a[text()="Save"]')[0]
                 save_btn.click()
 
-                wait.until(
-                    lambda browser: browser.find_elements_by_class_name(
-                        "job-application__offices"
-                    )
-                )
+                wait.until(lambda browser: browser.find_elements_by_class_name("job-application__offices"))
+
                 publish_btns = browser.find_elements_by_css_selector("tr.job-application.draft img.publish-application-button")
                 for btn in publish_btns:
                     btn.click()
@@ -435,9 +425,7 @@ def main():
 
         while True:
             job_locations = browser.find_elements_by_class_name("job-application__offices")
-            publish_btns = browser.find_elements_by_css_selector(
-                "tr.job-application.draft img.publish-application-button"
-            )
+            publish_btns = browser.find_elements_by_css_selector("tr.job-application.draft img.publish-application-button")
             for btn in publish_btns:
                 btn.click()
                 time.sleep(0.5)
