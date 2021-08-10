@@ -370,7 +370,6 @@ def main():
             time.sleep(1.5)
 
             # Ensure page navigation and job details have had sufficient time to load
-            next_page = wait.until(lambda browser: browser.find_elements_by_class_name("next_page"))
             job_locations = wait.until(lambda browser: browser.find_elements_by_class_name("job-application__offices"))
             job_names = browser.find_elements_by_class_name("job-application__name")
             job_ids = browser.find_elements_by_class_name("job-edit-pencil")
@@ -382,9 +381,9 @@ def main():
             existing_names += [result.text.split("\n")[0] for result in job_names]
             existing_locations += [result.text.strip("()") for result in job_locations]
 
+            next_page = browser.find_elements_by_class_name("next_page")
             if not next_page:
-                print("ERROR: 'next_page' element not found. GH page formatting changed?")
-                return
+                break
 
             if "disabled" not in next_page[0].get_attribute("class"):
                 multipage = True
@@ -402,7 +401,7 @@ def main():
         if args.limit:
             canonical_list = [args.limit]
         else:
-            canonical_list = [existing_ids[i] for i,x in enumerate(existing_types) if "Canonical" == x]
+            canonical_list = [existing_ids[i] for i,x in enumerate(existing_types) if "Canonical" == x or "INTERNAL" == x]
 
         for canonical_job_id in canonical_list:
             canonical_job_name = [existing_names[i] for i,x in enumerate(existing_ids) if canonical_job_id == x][0]
@@ -420,7 +419,6 @@ def main():
 
                 for location_text in sorted(new_locations):
                     print(f"--> Processing {location_text}")
-                    break
                     publish_location_text = location_text.split(",")[-1].strip()
 
                     browser.get(f"{job_posts_page_url}s/new?from=duplicate&amp;greenhouse_job_application_id={canonical_job_id}")
@@ -441,18 +439,17 @@ def main():
                     location = browser.find_elements_by_xpath('//label[text()="Location"]/..//input[1]')[0]
                     location.clear()
                     location.send_keys(location_text)
-                    print(f"Publishing job {job_id} to {location_text}...")
 
                     ## Publish the posts out to our external partner sites
                     try:
                         browser.find_elements_by_xpath('//label[text()="Glassdoor"]/input[1]')[0].click()
                     except:
-                        print("Glassdoor board not available at the moment")
+                        print("INFO: Glassdoor board not available at the moment")
 
                     try:
                         browser.find_elements_by_xpath('//label[text()="Indeed"]/input[1]')[0].click()
                     except:
-                        print("Indeed board not available at the moment")
+                        print("INFO: Indeed board not available at the moment")
 
                     publish_location = browser.find_elements_by_xpath('//input[@placeholder="Select location"]')[0]
                     publish_location.clear()
@@ -474,11 +471,7 @@ def main():
                     save_btn = browser.find_elements_by_xpath('//a[text()="Save"]')[0]
                     save_btn.click()
 
-                    wait.until(
-                        lambda browser: browser.find_elements_by_class_name(
-                            "job-application__offices"
-                        )
-                    )
+                    wait.until(lambda browser: browser.find_elements_by_class_name("job-application__offices"))
 
         print(f"[Marking all job posts live]")
         browser.get(job_posts_page_url)
@@ -489,16 +482,17 @@ def main():
             time.sleep(1.5)
 
             # Ensure page navigation and job details have had sufficient time to load
-            next_page = wait.until(lambda browser: browser.find_elements_by_class_name("next_page"))
-            if not next_page:
-                print("ERROR: 'next_page' element not found. GH page formatting changed?")
-                return
-
+            wait.until(lambda browser: browser.find_elements_by_class_name("job-application__offices"))
+            
             ## Click the "Enable" button on each new post created, to make it live
             publish_btns = browser.find_elements_by_xpath('//tr[@class="job-application draft external"]//img[@class="publish-application-button"]')
             for btn in publish_btns:
                 btn.click()
                 time.sleep(0.5)
+
+            next_page = browser.find_elements_by_class_name("next_page")
+            if not next_page:
+                break
 
             if "disabled" not in next_page[0].get_attribute("class"):
                 next_page[0].click()
