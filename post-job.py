@@ -177,7 +177,7 @@ REGIONS = {
 
 ###############################################################
 def parse_credentials():
-    print("Inside: parse_credentials()")
+    #print("Inside: parse_credentials()")
 
     # Read configuration from secured file in $HOME/.config/
     creds = os.path.join(user_data_dir("greenhouse"), "login.tokens")
@@ -194,7 +194,7 @@ def parse_credentials():
 
 ###############################################################
 def sso_authenticate(browser, args):
-    print("Inside: sso_authenticate()")
+    #print("Inside: sso_authenticate()")
     (ghsso_user, ghsso_pass) = parse_credentials()
 
     browser.get(gh_url)
@@ -265,7 +265,7 @@ def delete_posts(browser, wait, job_id):
 
 ###############################################################
 def parse_args():
-    print("Inside: parse_args()")
+    #print("Inside: parse_args()")
     parser = argparse.ArgumentParser(
         description="Duplicate Greenhouse job postings to multiple locations."
     )
@@ -353,127 +353,158 @@ def main():
         wait = ui.WebDriverWait(browser, 60) # timeout after 60 seconds
 
         if args.reset:
-            delete_posts(browser, wait, job_id)
+            print("[Disabled] The reset function must be updated to support multiple Canonical jobs.")
+            #delete_posts(browser, wait, job_id)
             exit()
 
         multipage = False
+        page = 1
+        existing_ids = []
+        existing_types = []
+        existing_names = []
         existing_locations = []
 
+        print(f"[Harvesting job details]")
         while True:
-            # Ensure page navigation and job locations have had sufficient time to load
+            print(f"-> Processing page {page}")
+            time.sleep(1.5)
+
+            # Ensure page navigation and job details have had sufficient time to load
             next_page = wait.until(lambda browser: browser.find_elements_by_class_name("next_page"))
             job_locations = wait.until(lambda browser: browser.find_elements_by_class_name("job-application__offices"))
+            job_names = browser.find_elements_by_class_name("job-application__name")
+            job_ids = browser.find_elements_by_class_name("job-edit-pencil")
+            job_types = browser.find_elements_by_class_name("board-column")
 
-            # gather all existing job post locations from each page of results
+            # harvest job details from each page of results
+            existing_types += [result.text for result in job_types]
+            existing_ids += [result.get_attribute("href").split("/")[4] for result in job_ids]
+            existing_names += [result.text.split("\n")[0] for result in job_names]
             existing_locations += [result.text.strip("()") for result in job_locations]
-
-            print(*existing_locations, sep = "\n")
 
             if not next_page:
                 print("ERROR: 'next_page' element not found. GH page formatting changed?")
                 return
 
             if "disabled" not in next_page[0].get_attribute("class"):
-                print(next_page[0].get_attribute("class"))
                 multipage = True
+                page += 1
                 next_page[0].click()
             else:
                 break
  
-            time.sleep(1.5)
-
         # return to first page of job posts
         if multipage:
             browser.get(job_posts_page_url)
+            time.sleep(1.5)
 
-        time.sleep(1.5)
+        # Process updates for each `Canonical` job unless a limit arg is passed
+        if args.limit:
+            canonical_list = [args.limit]
+        else:
+            canonical_list = [existing_ids[i] for i,x in enumerate(existing_types) if "Canonical" == x]
 
-        for region in args.regions:
-            region_locations = REGIONS[region]
-            new_locations = set(region_locations) - set(existing_locations)
+        for canonical_job_id in canonical_list:
+            canonical_job_name = [existing_names[i] for i,x in enumerate(existing_ids) if canonical_job_id == x][0]
+            limited_locations = [existing_locations[i] for i,x in enumerate(existing_names) if canonical_job_name in x]
 
-            for location_text in sorted(new_locations):
-                publish_location_text = location_text.split(",")[-1].strip()
+            print(f"[Creating posts for \"{canonical_job_name}\"]")
+            for region in args.regions:
+                print(f"-> Processing {region}")
+                region_locations = REGIONS[region]
+                new_locations = set(region_locations) - set(limited_locations)
 
-                duplicate_link = wait.until(lambda browser: browser.find_elements_by_xpath(
-                        '//*[@id="job_applications"]//tr//a[text()="Duplicate"]'
+                if not new_locations:
+                    print(f"--> All locations already exist.")
+                    continue
+
+                for location_text in sorted(new_locations):
+                    print(f"--> Processing {location_text}")
+                    break
+                    publish_location_text = location_text.split(",")[-1].strip()
+
+                    browser.get(f"{job_posts_page_url}s/new?from=duplicate&amp;greenhouse_job_application_id={canonical_job_id}")
+                    time.sleep(2.5)
+
+                    browser.refresh()
+                    job_name_txt = browser.find_elements_by_xpath('//input[contains(@class, "Input__InputElem-ipbxf8-0")]')[0]
+
+                    job_name = (job_name_txt.get_attribute("value").replace("Copy of ", "").strip())
+
+                    job_name_txt.clear()
+                    job_name_txt.send_keys(job_name)
+
+                    post_to = browser.find_elements_by_xpath('//label[text()="Post To"]/..//input[1]')[0]
+                    post_to.send_keys(JOB_BOARD)
+                    post_to.send_keys(Keys.ENTER)
+
+                    location = browser.find_elements_by_xpath('//label[text()="Location"]/..//input[1]')[0]
+                    location.clear()
+                    location.send_keys(location_text)
+                    print(f"Publishing job {job_id} to {location_text}...")
+
+                    ## Publish the posts out to our external partner sites
+                    try:
+                        browser.find_elements_by_xpath('//label[text()="Glassdoor"]/input[1]')[0].click()
+                    except:
+                        print("Glassdoor board not available at the moment")
+
+                    try:
+                        browser.find_elements_by_xpath('//label[text()="Indeed"]/input[1]')[0].click()
+                    except:
+                        print("Indeed board not available at the moment")
+
+                    publish_location = browser.find_elements_by_xpath('//input[@placeholder="Select location"]')[0]
+                    publish_location.clear()
+                    publish_location.send_keys(publish_location_text)
+                    popup_menu_xpath = (
+                        f'//ul[contains(@class, "ui-menu")]'
+                        f'/li[contains(@class, "ui-menu-item")]'
+                        f'/div[contains(text(), "{publish_location_text}")]'
                     )
-                )
 
-                # This is a quick workaround for roles with multiple
-                # _different_ job posts within it
-                if args.limit:
-                    result = list(filter(lambda u: args.limit in u.get_attribute("href"),duplicate_link,))
-                    page = result[0].get_attribute("href")
-                    print(page)
-                    if search(args.limit, page):
-                        browser.get(page)
-                else:
-                    page = duplicate_link[0].get_attribute("href")
-                    print(page)
-                    browser.get(page)
-                    # continue
+                    location_choices = wait.until(
+                        lambda browser: browser.find_elements_by_xpath(popup_menu_xpath)
+                    )
+                    publish_location.send_keys(Keys.DOWN)
+                    publish_location.send_keys(Keys.TAB)
+                    time.sleep(0.5)
 
-                time.sleep(2.5)
-                browser.refresh()
-                job_name_txt = browser.find_elements_by_xpath('//input[contains(@class, "Input__InputElem-ipbxf8-0")]')[0]
-                print(job_name_txt)
+                    # click the Save button
+                    save_btn = browser.find_elements_by_xpath('//a[text()="Save"]')[0]
+                    save_btn.click()
 
-                job_name = (job_name_txt.get_attribute("value").replace("Copy of ", "").strip())
+                    wait.until(
+                        lambda browser: browser.find_elements_by_class_name(
+                            "job-application__offices"
+                        )
+                    )
 
-                job_name_txt.clear()
-                job_name_txt.send_keys(job_name)
+        print(f"[Marking all job posts live]")
+        browser.get(job_posts_page_url)
+        page = 1
 
-                post_to = browser.find_elements_by_xpath('//label[text()="Post To"]/..//input[1]')[0]
-                post_to.send_keys(JOB_BOARD)
-                post_to.send_keys(Keys.ENTER)
+        while True:
+            print(f"-> Processing page {page}")
+            time.sleep(1.5)
 
-                location = browser.find_elements_by_xpath('//label[text()="Location"]/..//input[1]')[0]
-                location.clear()
-                location.send_keys(location_text)
-                print(f"Publishing job {job_id} to {location_text}...")
+            # Ensure page navigation and job details have had sufficient time to load
+            next_page = wait.until(lambda browser: browser.find_elements_by_class_name("next_page"))
+            if not next_page:
+                print("ERROR: 'next_page' element not found. GH page formatting changed?")
+                return
 
-                ## Publish the posts out to our external partner sites
-                try:
-                    browser.find_elements_by_xpath('//label[text()="Glassdoor"]/input[1]')[0].click()
-                except:
-                    print("Glassdoor board not available at the moment")
-
-                try:
-                    browser.find_elements_by_xpath('//label[text()="Indeed"]/input[1]')[0].click()
-                except:
-                    print("Indeed board not available at the moment")
-
-                publish_location = browser.find_elements_by_xpath('//input[@placeholder="Select location"]')[0]
-                publish_location.clear()
-                publish_location.send_keys(publish_location_text)
-                popup_menu_xpath = (
-                    f'//ul[contains(@class, "ui-menu")]'
-                    f'/li[contains(@class, "ui-menu-item")]'
-                    f'/div[contains(text(), "{publish_location_text}")]'
-                )
-
-                location_choices = wait.until(
-                    lambda browser: browser.find_elements_by_xpath(popup_menu_xpath)
-                )
-                publish_location.send_keys(Keys.DOWN)
-                publish_location.send_keys(Keys.TAB)
+            ## Click the "Enable" button on each new post created, to make it live
+            publish_btns = browser.find_elements_by_xpath('//tr[@class="job-application draft external"]//img[@class="publish-application-button"]')
+            for btn in publish_btns:
+                btn.click()
                 time.sleep(0.5)
 
-                # click the Save button
-                save_btn = browser.find_elements_by_xpath('//a[text()="Save"]')[0]
-                save_btn.click()
-
-                wait.until(
-                    lambda browser: browser.find_elements_by_class_name(
-                        "job-application__offices"
-                    )
-                )
-                ## Click the "Enable" button on each new post created, to make it live
-                publish_btns = browser.find_elements_by_css_selector("tr.job-application.draft img.publish-application-button")
-                for btn in publish_btns:
-                    btn.click()
-                    time.sleep(0.5)
+            if "disabled" not in next_page[0].get_attribute("class"):
+                next_page[0].click()
+                page += 1
+            else:
+                break
 
     print("All done! Now go bring those candidates through to offers!")
 
